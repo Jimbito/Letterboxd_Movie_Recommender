@@ -13,6 +13,7 @@ from tqdm import tqdm
 import boto3
 import re as regex
 from time import sleep
+import pandas as pd
 
 
 class WebDriver():
@@ -88,7 +89,7 @@ class WebDriver():
         poster_list = self.driver.find_element(By.XPATH, poster_list_xpath)
         posters = poster_list.find_elements(By.TAG_NAME, 'li')
 
-        for poster in posters:
+        for poster in posters[:3]:
             a_tag = poster.find_element(By.TAG_NAME, 'a')
             href = a_tag.get_attribute('href')
             href_list.append(href)
@@ -222,10 +223,18 @@ class WebDriver():
         for href in href_list:
             self.driver.get(href)
             film_data = self.scrape_film() 
-            film = {href:film_data}
-            page_list.append(film)
-            print(len(page_list))
+            page_list.append({str(href):film_data})
         return page_list
+
+    
+    def write_to_csv(self):
+        '''
+        
+        '''
+        film_list = self.scrape_film
+        df = pd.DataFrame(film_list)
+        df.to_csv('walle.csv', index=False)
+
 
 
 
@@ -249,6 +258,7 @@ def run_scraper():
     driver = WebDriver(URL)
     driver.open_the_webpage()
     driver.scrape_page()
+    driver.write_to_csv()
  
 
 
