@@ -210,29 +210,29 @@ class WebDriver():
         film_cast = self.obtain_film_cast()
         film_genres = self.obtain_film_genres()
         film_data = [film_date,film_tagline,film_description,film_director,film_cast,film_genres]
-        print(film_data)
         return film_data    
 
 
-    def scrape_page(self):
+    def scrape_page(self) -> dict:
         '''
         
         '''
-        page_list = []
+        page_dict = {}
         href_list = self.obtain_poster_hrefs()
         for href in href_list:
             self.driver.get(href)
             film_data = self.scrape_film() 
-            page_list.append({str(href):film_data})
-        return page_list
+            page_dict.update({href:film_data})
+        print(page_dict)
+        return page_dict
 
     
     def write_to_csv(self):
         '''
         
         '''
-        film_list = self.scrape_film
-        df = pd.DataFrame(film_list)
+        page_dict = self.scrape_page
+        df = pd.DataFrame(page_dict)
         df.to_csv('walle.csv', index=False)
 
 
