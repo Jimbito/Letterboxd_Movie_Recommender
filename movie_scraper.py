@@ -14,7 +14,7 @@ import boto3
 import re as regex
 from time import sleep
 import pandas as pd
-
+import json
 
 class WebDriver():
     '''
@@ -38,8 +38,11 @@ class WebDriver():
         Returns:
             None
         '''
+        prefs = {'profile.managed_default_content_settings.images': 2}
         chrome_options = Options()
         chrome_options.add_experimental_option("detach", True)
+        chrome_options.add_experimental_option('prefs', prefs)
+
         self.driver = webdriver.Chrome(options=chrome_options)
         self.driver.get(self.url)
         self.driver.maximize_window() #maximised window helps reduce the frequency of unclickable elements
@@ -89,13 +92,22 @@ class WebDriver():
         poster_list = self.driver.find_element(By.XPATH, poster_list_xpath)
         posters = poster_list.find_elements(By.TAG_NAME, 'li')
 
-        for poster in posters[:3]:
+        for poster in posters:
             a_tag = poster.find_element(By.TAG_NAME, 'a')
             href = a_tag.get_attribute('href')
             href_list.append(href)
         return href_list
 
-
+    def obtain_film_name(self, xpath: str='//*[@id="featured-film-header"]/h1') -> str:
+        '''
+        
+        '''
+        film_xpath = xpath
+        element = self.driver.find_element(By.XPATH, film_xpath)
+        outer_html = element.get_attribute('outerHTML')
+        film = regex.search('>(.*)</h1>', outer_html).group(1)
+        return film
+        
     def obtain_film_date(self, xpath: str='//*[@id="featured-film-header"]/p/small/a') -> str:
         '''
         
@@ -122,8 +134,7 @@ class WebDriver():
             unformatted_tagline = regex.search('>(.*)</h4>', outer_html).group(1)
             tagline = unformatted_tagline.replace('&nbsp;', ' ')
         except:
-            # film has no tagline.
-            pass
+            tagline = None
         return tagline
 
 
@@ -198,19 +209,28 @@ class WebDriver():
         return cast_list
 
 
-    def scrape_film(self) -> list:
+    def obtain_film_poster(self, xpath: str='//*[@id="js-poster-col"]/section[1]/div/div/img') -> str:
+        '''
+
+        '''
+        poster_xpath = xpath
+        
+
+    def scrape_film(self) -> dict:
         '''
         
         '''
         self.accept_cookies()
+        film_name = self.obtain_film_name()
         film_date = self.obtain_film_date()
         film_tagline = self.obtain_film_tagline()
         film_description = self.obtain_film_description()
         film_director = self.obtain_director()
         film_cast = self.obtain_film_cast()
         film_genres = self.obtain_film_genres()
-        film_data = [film_date,film_tagline,film_description,film_director,film_cast,film_genres]
-        return film_data    
+        film_dict = {"Film":film_name, "Release date": film_date, "Tagline": film_tagline, "Description":film_description,
+        "Director":film_director, "Cast":film_cast, "Genres":film_genres}
+        return film_dict    
 
 
     def scrape_page(self) -> dict:
@@ -221,21 +241,31 @@ class WebDriver():
         href_list = self.obtain_poster_hrefs()
         for href in href_list:
             self.driver.get(href)
-            film_data = self.scrape_film() 
-            page_dict.update({href:film_data})
-        print(page_dict)
+            film_dict = self.scrape_film() 
+            film_name = film_dict.get('Film')
+            page_dict.update({film_name:film_dict})
         return page_dict
-
     
-    def write_to_csv(self):
+
+    def film_dict_to_json(self):
         '''
         
         '''
-        page_dict = self.scrape_page
-        df = pd.DataFrame(page_dict)
-        df.to_csv('walle.csv', index=False)
+        film_dict = self.scrape_film()
+        film_name = film_dict.get('Film')
 
-
+        with open(f"{film_name}.json", 'w') as fp:
+            json.dump(film_dict, fp)
+            
+        
+    
+    def page_dict_to_json(self):
+        '''
+        
+        '''
+        page_dict = self.scrape_page()
+        with open(f"page_dict.json", 'w') as fp:
+            json.dump(page_dict, fp)
 
 
 class StoreData():
@@ -257,8 +287,7 @@ def run_scraper():
     #URL = 'https://letterboxd.com/film/walle/'
     driver = WebDriver(URL)
     driver.open_the_webpage()
-    driver.scrape_page()
-    driver.write_to_csv()
+    driver.page_dict_to_json()
  
 
 
