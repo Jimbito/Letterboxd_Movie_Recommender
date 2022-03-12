@@ -1,25 +1,20 @@
-from botocore.utils import should_bypass_proxies
+from cProfile import run
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver import ActionChains
 import urllib
 import urllib.request
 import tempfile
-from tqdm import tqdm
-import boto3
-import re as regex
-from time import sleep
-import pandas as pd
 import json
+import re as regex
+
 
 class WebDriver():
     '''
     This class is used to control the webdriver and scraper
-
     Attributes:
         url (str): The URL of the home webpage to navigate to
         driver (selenium.webdriver): The webdriver object
@@ -31,37 +26,72 @@ class WebDriver():
         '''
         self.url = url
 
+
     def open_the_webpage(self) -> None:
         '''
         This function is used to open the webpage to the URL defined in the instance attribute and close any pop-ups
-
         Returns:
             None
         '''
         prefs = {'profile.managed_default_content_settings.images': 2}
-        chrome_options = Options()
+        chrome_options=Options()
         chrome_options.add_experimental_option("detach", True)
         chrome_options.add_experimental_option('prefs', prefs)
+        chrome_options.add_argument("--window-size=1920,1080")
+        chrome_options.add_argument("--disable-extensions")
+        chrome_options.add_argument("--proxy-server='direct://'")
+        chrome_options.add_argument("--proxy-bypass-list=*")
+        chrome_options.add_argument("--start-maximized")
+        chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
+
+        #chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--ignore-certificate-errors')
+        chrome_options.add_argument('--allow-running-insecure-content')
+        user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.50 Safari/537.36'
+        chrome_options.add_argument(f'user-agent={user_agent}')
 
         self.driver = webdriver.Chrome(options=chrome_options)
         self.driver.get(self.url)
         self.driver.maximize_window() #maximised window helps reduce the frequency of unclickable elements
         self.accept_cookies()
-        
+        self.what_to_scrape()
     
-    def accept_cookies(self, xpath: str='//*[@id="tyche_cmp_modal"]/div/div/div/div[5]/div[2]/a/span') -> None:
+    def accept_cookies(self, css: str = '#tyche_cmp_modal > div > div > div > div:nth-of-type(5) > div:nth-of-type(2) > a') -> None:
         '''
         This function is used to close the accept cookies pop-up
-
         Returns:
             None
         '''
-        accept_cookies_xpath = xpath
-        try:
-            button = self.driver.find_element(By.XPATH, accept_cookies_xpath)
-            WebDriverWait(self.driver, 5).until(EC.element_to_be_clickable(button)).click()
-        except:
-            pass
+        accept_cookies_css = css
+        button = self.driver.find_element(By.CSS_SELECTOR, accept_cookies_css)
+        WebDriverWait(self.driver, 5).until(EC.element_to_be_clickable(button)).click()
+    
+
+    def what_to_scrape(self, 
+    css1: str = '#html > body > ul:first-of-type',
+    css2: str = '#html > body > ul:nth-of-type(3)',
+    css3: str = '#html > body > ul:nth-of-type(4)'):
+        
+        
+        year_css = css1
+        popularity_css = css2
+        genre_css = css3
+        
+
+        year_container = self.driver.find_element(By.CSS_SELECTOR, year_css)
+        container_items = year_container.find_elements(By.TAG_NAME, 'li')
+        items = {}
+        for item in container_items[1:]:
+            a_tag = item.find_element(By.TAG_NAME, 'a')
+            href = a_tag.get_attribute('href')
+            outer_html = item.get_attribute('outerHTML')
+            option_key = regex.search('">(.*)</a>', outer_html).group(1)
+            key_value = {option_key:href}
+            items.update(key_value)
+        print(items)
         
 
     def next_page(self, xpath: str='//*[@id="films-browser-list-container"]/div/div[2]/a') -> None:
@@ -268,28 +298,13 @@ class WebDriver():
             json.dump(page_dict, fp)
 
 
-class StoreData():
-    '''
-    This class is used to interact with the S3 Bucket and store the scraped images and features
-    '''
-    def __init__(self) -> None:
-        pass
-
-    def upload_image_to_datalake(self):
-        pass
-
-
-# TODO: Create a pandas data frame, with each feature, and URL, and unique ID
-
 
 def run_scraper():
-    URL = "https://letterboxd.com/films/popular/"
-    #URL = 'https://letterboxd.com/film/walle/'
+    
+    URL = "https://letterboxd.com/films/"
     driver = WebDriver(URL)
     driver.open_the_webpage()
-    driver.page_dict_to_json()
- 
+    #driver.close_down()
 
-
-
-run_scraper()
+if __name__ == '__main__':
+    run_scraper()
